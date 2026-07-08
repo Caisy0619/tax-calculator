@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业所得税测算工具</title>
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --card: #ffffff;
+    --green: #2a7a4a;
+    --green-light: #e8f5ee;
+    --green-dark: #1a5b3a;
+    --text: #2c2c2c;
+    --text-light: #777;
+    --border: #dce3da;
+    --red: #c0392b;
+    --red-light: #fdecea;
+    --blue-light: #eaf2fb;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 20px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  /* 页头 */
+  .header { text-align: center; padding: 30px 0 10px; }
+  .header h1 { font-size: 28px; color: var(--green-dark); font-weight: 700; letter-spacing: 1px; }
+  .header .subtitle { color: var(--text-light); font-size: 13px; margin-top: 4px; }
+
+  /* 免责声明 */
+  .disclaimer {
+    background: #fff8e6; border: 1px solid #f0dbad; border-radius: 8px;
+    padding: 12px 16px; font-size: 12px; color: #8a6d3b; margin: 15px 0; line-height: 1.5;
+  }
+  .disclaimer strong { color: #6b4f28; }
+
+  /* 卡片 */
+  .card {
+    background: var(--card); border-radius: 10px; border: 1px solid var(--border);
+    padding: 20px 24px; margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .card h2 {
+    font-size: 16px; color: var(--green-dark); margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--green-light);
+  }
+
+  /* 表单 */
+  .form-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; align-items: center; }
+  .form-row label { min-width: 90px; font-size: 14px; font-weight: 500; color: #555; }
+  .form-row input, .form-row select {
+    width: 160px; padding: 8px 12px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 14px; background: #faf9f6; transition: border .2s;
+  }
+  .form-row input:focus, .form-row select:focus {
+    outline: none; border-color: var(--green); background: #fff;
+  }
+  .unit { font-size: 13px; color: var(--text-light); margin-left: 4px; }
+
+  /* 录入表格 */
+  .input-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .input-table th, .input-table td { padding: 8px 10px; text-align: center; border: 1px solid var(--border); }
+  .input-table th {
+    background: var(--green-dark); color: #fff; font-weight: 600; font-size: 13px;
+    position: sticky; top: 0;
+  }
+  .input-table th:first-child { text-align: left; min-width: 130px; }
+  .input-table td:first-child {
+    text-align: left; font-weight: 500; background: #faf9f6;
+  }
+  .input-table .scenario-name { min-width: 80px; }
+  .input-table .scenario-actions { font-size: 12px; }
+  .input-table .scenario-actions button {
+    background: none; border: none; color: var(--red); cursor: pointer;
+    font-size: 16px; padding: 2px 6px;
+  }
+  .input-table .scenario-actions button:hover { color: #922b21; }
+  .input-table input {
+    width: 80px; padding: 5px 8px; border: 1px solid var(--border);
+    border-radius: 4px; font-size: 13px; text-align: right; background: #faf9f6;
+  }
+  .input-table input:focus {
+    outline: none; border-color: var(--green); background: #fff;
+  }
+  .input-table .highlight-row td { background: #f0f8eb; }
+  .input-table .highlight-row td:first-child { background: #e6f3e0; }
+
+  /* 结果表格 */
+  .result-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .result-table th, .result-table td { padding: 8px 10px; text-align: center; border: 1px solid var(--border); }
+  .result-table th {
+    background: var(--green-dark); color: #fff; font-weight: 600; font-size: 13px;
+  }
+  .result-table th:first-child { text-align: left; }
+  .result-table td:first-child { text-align: left; font-weight: 500; background: #faf9f6; }
+  .result-table .total-row td { background: #e8f5ee; font-weight: 700; }
+  .result-table .total-row td:first-child { background: #d4eddb; }
+  .result-table .tax-row td { background: var(--green-light); font-weight: 700; font-size: 14px; }
+  .result-table .tax-row td:first-child { background: #c8e6d2; }
+  .result-table .pos { color: var(--red); }
+  .result-table .neg { color: var(--green); }
+
+  /* 按钮 */
+  .btn {
+    display: inline-block; padding: 8px 20px; border: none; border-radius: 6px;
+    font-size: 13px; cursor: pointer; transition: all .2s; font-weight: 500;
+  }
+  .btn-primary { background: var(--green-dark); color: #fff; }
+  .btn-primary:hover { background: #0f4127; }
+  .btn-outline { background: transparent; border: 1px solid var(--green); color: var(--green); }
+  .btn-outline:hover { background: var(--green-light); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #922b21; }
+  .btn-sm { padding: 4px 12px; font-size: 12px; }
+
+  .actions { display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+
+  /* 详细调整明细（可折叠） */
+  .detail-toggle {
+    display: inline-block; color: var(--green); cursor: pointer; font-size: 13px;
+    margin: 8px 0; user-select: none;
+  }
+  .detail-toggle:hover { text-decoration: underline; }
+  .detail-section { display: none; }
+  .detail-section.show { display: block; }
+
+  /* 响应式 */
+  @media (max-width: 768px) {
+    body { padding: 12px; }
+    .card { padding: 14px; }
+    .header h1 { font-size: 22px; }
+    .input-table { font-size: 12px; }
+    .input-table th, .input-table td { padding: 5px 6px; }
+    .input-table input { width: 60px; font-size: 12px; padding: 4px 6px; }
+    .input-table th:first-child { min-width: 80px; }
+    .form-row { gap: 8px; }
+    .form-row input, .form-row select { width: 120px; }
+    .result-table { font-size: 12px; }
+    .result-table th, .result-table td { padding: 5px 6px; }
+  }
+  @media (max-width: 480px) {
+    .input-table input { width: 50px; font-size: 11px; padding: 3px 4px; }
+    .input-table th:first-child { min-width: 60px; font-size: 11px; }
+    .input-table th, .input-table td { padding: 4px 3px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 页头 -->
+  <div class="header">
+    <h1>企业所得税测算工具</h1>
+    <p class="subtitle">输入收入与成本 · 对比不同方案下的税负差异</p>
+  </div>
+
+  <!-- 免责声明 -->
+  <div class="disclaimer">
+    <strong>⚖ 免责声明：</strong>本页面仅为学习模拟与参考测算工具，所有计算结果仅供初步了解企业所得税逻辑之用，不构成任何税务或财务建议。实际税务处理应以《中华人民共和国企业所得税法》及相关法规、税务机关最终认定为准。
+  </div>
+
+  <!-- 基本信息 -->
+  <div class="card">
+    <h2>基本信息</h2>
+    <div class="form-row">
+      <label>营业收入</label>
+      <input type="number" id="revenue" value="500" step="1" min="0">
+      <span class="unit">万元</span>
+    </div>
+    <div class="form-row">
+      <label>企业类型</label>
+      <select id="enterpriseType">
+        <option value="25">一般企业 — 25%</option>
+        <option value="15">高新技术企业 — 15%</option>
+        <option value="5">小型微利企业（≤100万利润）— 约5%</option>
+        <option value="10">小型微利企业（100~300万利润）— 约10%</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 费用录入 -->
+  <div class="card">
+    <h2>成本费用录入</h2>
+    <p style="font-size:12px;color:var(--text-light);margin-bottom:10px;">
+      每个方案对应一套成本结构。填入各费用项目金额（单位：万元），自动计算纳税调整与税负差异。
+    </p>
+    <div class="actions">
+      <button class="btn btn-primary btn-sm" onclick="addScenario()">+ 添加方案</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="input-table" id="inputTable">
+        <thead>
+          <tr id="inputHeader">
+            <th>费用项目</th>
+            <th class="scenario-name" data-scenario="0">
+              方案1 <span class="scenario-actions"></span>
+            </th>
+            <th class="scenario-name" data-scenario="1">
+              方案2 <span class="scenario-actions"></span>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="inputBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 计算结果对比 -->
+  <div class="card">
+    <h2>计算结果对比</h2>
+    <div style="overflow-x:auto;">
+      <table class="result-table" id="resultTable">
+        <thead>
+          <tr id="resultHeader">
+            <th>项目</th>
+            <th>方案1</th>
+            <th>方案2</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+
+    <div class="detail-toggle" onclick="toggleDetail()">▸ 查看每项费用纳税调整明细</div>
+    <div class="detail-section" id="detailSection">
+      <div style="overflow-x:auto;">
+        <table class="result-table" id="detailTable">
+          <thead>
+            <tr id="detailHeader">
+              <th>费用项目</th>
+              <th>方案1 实际</th>
+              <th>方案1 可扣</th>
+              <th>方案1 调增</th>
+              <th>方案2 实际</th>
+              <th>方案2 可扣</th>
+              <th>方案2 调增</th>
+            </tr>
+          </thead>
+          <tbody id="detailBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="disclaimer" style="margin-top:20px;">
+    <strong>📌 说明：</strong>
+    · 福利费上限 = 工资总额 × 14% &nbsp;|&nbsp;
+    教育经费上限 = 工资总额 × 8% &nbsp;|&nbsp;
+    工会经费上限 = 工资总额 × 2%<br>
+    · 业务招待费上限 = min(实际×60%, 营业收入×5‰) &nbsp;|&nbsp;
+    广告宣传费上限 = 营业收入×15%<br>
+    · 捐赠支出上限 = 会计利润 × 12% &nbsp;|&nbsp;
+    差旅费、办公费、折旧摊销、其他成本：全额扣除（需合理凭证）
+  </div>
+</div>
+
+<script>
+// ========== 数据定义 ==========
+const EXPENSE_ITEMS = [
+  { id:'salary',         name:'工资薪金',    rule:'全额扣除',               depends:[] },
+  { id:'social',         name:'社保公积金（公司）', rule:'全额扣除',         depends:[] },
+  { id:'welfare',        name:'职工福利费',   rule:'≤工资14%',              depends:['salary'] },
+  { id:'education',      name:'职工教育经费', rule:'≤工资8%',               depends:['salary'] },
+  { id:'union',          name:'工会经费',     rule:'≤工资2%',               depends:['salary'] },
+  { id:'entertainment',  name:'业务招待费',   rule:'min(60%, 收入5‰)',      depends:[], usesRevenue:true },
+  { id:'advertising',    name:'广告宣传费',   rule:'≤收入15%',              depends:[], usesRevenue:true },
+  { id:'travel',         name:'差旅费',       rule:'全额扣除（有凭证）',    depends:[] },
+  { id:'office',         name:'办公费',       rule:'全额扣除',               depends:[] },
+  { id:'donation',       name:'捐赠支出',     rule:'≤利润12%',              depends:[], usesProfit:true },
+  { id:'depreciation',   name:'折旧摊销',     rule:'全额扣除（税法标准）',   depends:[] },
+  { id:'other',          name:'其他成本',     rule:'全额扣除（需合理凭证）',  depends:[] },
+];
+
+let scenarios = ['方案1', '方案2'];
+let scenarioDefaults = [
+  { salary:120, social:25, welfare:20, education:6, union:3, entertainment:15,
+    advertising:30, travel:8, office:5, donation:10, depreciation:15, other:20 },
+  { salary:130, social:28, welfare:18, education:5, union:2, entertainment:10,
+    advertising:25, travel:10, office:6, donation:8, depreciation:18, other:25 },
+];
+let scenarioData = JSON.parse(JSON.stringify(scenarioDefaults));
+
+// ========== 计算逻辑 ==========
+function calcScenario(revenue, typeRate, data) {
+  const actual = {};
+  for (const item of EXPENSE_ITEMS) {
+    actual[item.id] = parseFloat(data[item.id]) || 0;
+  }
+
+  // 1. 全额扣除项（无限制）
+  const fullDeductIds = ['salary','social','travel','office','depreciation','other'];
+  const adjustments = {};
+  for (const id of fullDeductIds) {
+    adjustments[id] = { actual: actual[id], limit: actual[id], deduction: actual[id], adj: 0 };
+  }
+
+  // 2. 按工资比例扣除
+  const salary = actual.salary;
+  const ratioItems = [
+    { id:'welfare', ratio:0.14 },
+    { id:'education', ratio:0.08 },
+    { id:'union', ratio:0.02 },
+  ];
+  for (const r of ratioItems) {
+    const limit = salary * r.ratio;
+    const deduction = Math.min(actual[r.id], limit);
+    adjustments[r.id] = { actual: actual[r.id], limit, deduction, adj: actual[r.id] - deduction };
+  }
+
+  // 3. 业务招待费
+  const ent = actual.entertainment;
+  const entLimit1 = ent * 0.6;
+  const entLimit2 = revenue * 0.005;
+  const entLimit = Math.min(entLimit1, entLimit2);
+  const entDeduction = Math.min(ent, entLimit);
+  adjustments.entertainment = { actual: ent, limit: entLimit, deduction: entDeduction, adj: ent - entDeduction };
+
+  // 4. 广告宣传费
+  const adv = actual.advertising;
+  const advLimit = revenue * 0.15;
+  const advDeduction = Math.min(adv, advLimit);
+  adjustments.advertising = { actual: adv, limit: advLimit, deduction: advDeduction, adj: adv - advDeduction };
+
+  // 5. 捐赠支出（需迭代：利润取决于捐赠，捐赠上限取决于利润）
+  const dont = actual.donation;
+  const otherExpenses = EXPENSE_ITEMS.filter(i => i.id !== 'donation').reduce((s, i) => s + (actual[i.id]||0), 0);
+  let profit = revenue - otherExpenses - dont;
+  let donationLimit = 0;
+  for (let iter = 0; iter < 5; iter++) {
+    profit = revenue - otherExpenses - (dont > 0 ? Math.min(dont, donationLimit) : 0);
+    donationLimit = Math.max(0, profit * 0.12);
+  }
+  const donationDeduction = Math.min(dont, donationLimit);
+  adjustments.donation = { actual: dont, limit: donationLimit, deduction: donationDeduction, adj: dont - donationDeduction };
+
+  // 汇总
+  const totalActual = EXPENSE_ITEMS.reduce((s, i) => s + adjustments[i.id].actual, 0);
+  const totalDeduction = EXPENSE_ITEMS.reduce((s, i) => s + adjustments[i.id].deduction, 0);
+  const totalAdj = EXPENSE_ITEMS.reduce((s, i) => s + adjustments[i.id].adj, 0);
+  const accountingProfit = revenue - totalActual;
+  const taxableIncome = accountingProfit + totalAdj;
+
+  // 税率
+  let taxRate = parseFloat(typeRate);
+  let taxPayable = 0;
+  if (typeRate === '5') {
+    // 小微 ≤100万利润
+    taxRate = 5;
+    const mini = Math.min(taxableIncome, 100);
+    const rest = Math.max(0, taxableIncome - 100);
+    taxPayable = mini * 0.05 + rest * 0.10;
+  } else if (typeRate === '10') {
+    // 小微 100~300万
+    taxRate = 10;
+    const mini = Math.min(taxableIncome, 100);
+    const rest = Math.max(0, taxableIncome - 100);
+    taxPayable = mini * 0.05 + rest * 0.10;
+  } else {
+    taxRate = parseFloat(typeRate) / 100;
+    taxPayable = taxableIncome * taxRate;
+  }
+
+  return {
+    adjustments, totalActual, totalDeduction, totalAdj,
+    accountingProfit, taxableIncome, taxRate: taxRate * 100,
+    taxPayable, effectiveRate: taxableIncome > 0 ? (taxPayable / taxableIncome * 100) : 0
+  };
+}
+
+// ========== 渲染 ==========
+function render() {
+  const revenue = parseFloat(document.getElementById('revenue').value) || 0;
+  const typeRate = document.getElementById('enterpriseType').value;
+
+  const sCount = scenarios.length;
+
+  // --- 录入表头 ---
+  const header = document.getElementById('inputHeader');
+  header.innerHTML = '<th>费用项目</th>';
+  for (let i = 0; i < sCount; i++) {
+    const th = document.createElement('th');
+    th.className = 'scenario-name';
+    th.style.cssText = 'text-align:center;';
+    th.innerHTML = scenarios[i] + ' ' +
+      (sCount > 2 ? `<span class="scenario-actions"><button onclick="removeScenario(${i})" title="删除此方案">✕</button></span>` : '');
+    header.appendChild(th);
+  }
+
+  // --- 录入内容 ---
+  const body = document.getElementById('inputBody');
+  body.innerHTML = '';
+  for (const item of EXPENSE_ITEMS) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${item.name}<br><span style="font-size:11px;color:#999;">${item.rule}</span></td>`;
+    for (let i = 0; i < sCount; i++) {
+      const td = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.step = '1';
+      inp.min = '0';
+      inp.value = scenarioData[i][item.id] || 0;
+      inp.dataset.scenario = i;
+      inp.dataset.item = item.id;
+      inp.oninput = function() {
+        scenarioData[parseInt(this.dataset.scenario)][this.dataset.item] = parseFloat(this.value) || 0;
+        render();
+      };
+      td.appendChild(inp);
+      td.appendChild(document.createTextNode(' 万'));
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+
+  // --- 计算结果 ---
+  const results = [];
+  for (let i = 0; i < sCount; i++) {
+    results.push(calcScenario(revenue, typeRate, scenarioData[i]));
+  }
+
+  // --- 结果表头 ---
+  const rHeader = document.getElementById('resultHeader');
+  rHeader.innerHTML = '<th>项目</th>';
+  for (let i = 0; i < sCount; i++) {
+    const th = document.createElement('th');
+    th.textContent = scenarios[i];
+    rHeader.appendChild(th);
+  }
+
+  // --- 结果内容 ---
+  const rBody = document.getElementById('resultBody');
+  rBody.innerHTML = '';
+
+  function addResultRow(label, values, cls, fmt = true) {
+    const tr = document.createElement('tr');
+    if (cls) tr.className = cls;
+    tr.innerHTML = `<td>${label}</td>`;
+    for (let i = 0; i < sCount; i++) {
+      const td = document.createElement('td');
+      let v = values[i];
+      if (fmt) {
+        // Diff highlight
+        const prev = i > 0 ? values[i-1] : null;
+        if (prev !== null && v !== prev) {
+          td.style.color = '#c0392b';
+        }
+      }
+      td.textContent = typeof v === 'number' ? v.toFixed(2) : v;
+      tr.appendChild(td);
+    }
+    rBody.appendChild(tr);
+  }
+
+  addResultRow('实际支出总额（万元）', results.map(r => r.totalActual));
+  addResultRow('纳税调增金额（万元）', results.map(r => r.totalAdj));
+  addResultRow('会计利润（万元）', results.map(r => r.accountingProfit));
+  addResultRow('应纳税所得额（万元）', results.map(r => r.taxableIncome));
+  rBody.insertAdjacentHTML('beforeend', `<tr style="height:6px;background:transparent;border:none;"><td colspan="${sCount+1}" style="border:none;padding:0;"></td></tr>`);
+  addResultRow('适用税率', results.map(r => r.taxRate.toFixed(1) + '%'), 'tax-row', false);
+  addResultRow('应交企业所得税（万元）', results.map(r => r.taxPayable), 'tax-row');
+  addResultRow('实际税负率', results.map(r => r.effectiveRate.toFixed(1) + '%'), 'tax-row', false);
+
+  // --- 详细调整明细 ---
+  const dHeader = document.getElementById('detailHeader');
+  dHeader.innerHTML = '<th>费用项目</th>';
+  for (let i = 0; i < sCount; i++) {
+    const th1 = document.createElement('th');
+    th1.textContent = scenarios[i] + ' 实际';
+    dHeader.appendChild(th1);
+    const th2 = document.createElement('th');
+    th2.textContent = scenarios[i] + ' 可扣';
+    dHeader.appendChild(th2);
+    const th3 = document.createElement('th');
+    th3.textContent = scenarios[i] + ' 调增';
+    dHeader.appendChild(th3);
+  }
+
+  const dBody = document.getElementById('detailBody');
+  dBody.innerHTML = '';
+  for (const item of EXPENSE_ITEMS) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${item.name}</td>`;
+    for (let i = 0; i < sCount; i++) {
+      const adj = results[i].adjustments[item.id];
+      tr.innerHTML += `<td>${adj.actual.toFixed(1)}</td>`;
+      tr.innerHTML += `<td>${adj.deduction.toFixed(1)}</td>`;
+      tr.innerHTML += `<td class="${adj.adj > 0 ? 'pos' : 'neg'}">${adj.adj.toFixed(1)}</td>`;
+    }
+    dBody.appendChild(tr);
+  }
+
+  // 汇总之行
+  const sumTr = document.createElement('tr');
+  sumTr.className = 'total-row';
+  sumTr.innerHTML = '<td>合计</td>';
+  for (let i = 0; i < sCount; i++) {
+    const adj = results[i].adjustments;
+    const totalAct = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].actual, 0);
+    const totalDed = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].deduction, 0);
+    const totalAdj = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].adj, 0);
+    sumTr.innerHTML += `<td>${totalAct.toFixed(1)}</td>`;
+    sumTr.innerHTML += `<td>${totalDed.toFixed(1)}</td>`;
+    sumTr.innerHTML += `<td class="pos">${totalAdj.toFixed(1)}</td>`;
+  }
+  dBody.appendChild(sumTr);
+}
+
+// ========== 交互 ==========
+function addScenario() {
+  const n = scenarios.length;
+  if (n >= 4) { alert('最多支持4个方案对比'); return; }
+  const name = '方案' + (n + 1);
+  scenarios.push(name);
+  scenarioData.push(JSON.parse(JSON.stringify(scenarioDefaults[0])));
+  render();
+}
+
+function removeScenario(idx) {
+  if (scenarios.length <= 2) { alert('至少保留2个方案'); return; }
+  scenarios.splice(idx, 1);
+  scenarioData.splice(idx, 1);
+  render();
+}
+
+function toggleDetail() {
+  const sec = document.getElementById('detailSection');
+  sec.classList.toggle('show');
+  const toggle = document.querySelector('.detail-toggle');
+  toggle.textContent = sec.classList.contains('show') ? '▾ 收起明细' : '▸ 查看每项费用纳税调整明细';
+}
+
+// ========== 实时更新 ==========
+document.getElementById('revenue').addEventListener('input', render);
+document.getElementById('enterpriseType').addEventListener('change', render);
+
+// ========== 初始化 ==========
+render();
+</script>
+</body>
+</html>
