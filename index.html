@@ -451,13 +451,13 @@ function render() {
     for (let i = 0; i < sCount; i++) {
       const td = document.createElement('td');
       const inp = document.createElement('input');
-      inp.type = 'number';
-      inp.step = '1';
-      inp.min = '0';
+      inp.type = 'text';
+      inp.inputMode = 'numeric';
+      inp.style.textAlign = 'right';
       inp.value = scenarioData[i][item.id] || 0;
       inp.dataset.scenario = i;
       inp.dataset.item = item.id;
-      inp.oninput = function() {
+      inp.onchange = function() {
         scenarioData[parseInt(this.dataset.scenario)][this.dataset.item] = parseFloat(this.value) || 0;
         render();
       };
