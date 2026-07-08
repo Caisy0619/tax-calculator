@@ -176,10 +176,14 @@
     <div class="form-row">
       <label>企业类型</label>
       <select id="enterpriseType">
-        <option value="25">一般企业 — 25%</option>
-        <option value="15">高新技术企业 — 15%</option>
-        <option value="5">小型微利企业（≤100万利润）— 约5%</option>
-        <option value="10">小型微利企业（100~300万利润）— 约10%</option>
+        <option value="25">一般企业 — 标准税率 25%</option>
+        <option value="hightech">高新技术企业 — 15%</option>
+        <option value="xw5">小型微利企业（年利润≤100万元）— 实际约 5%</option>
+        <option value="xw10">小型微利企业（年利润100~300万元）— 实际约 10%</option>
+        <option value="west">西部大开发鼓励类企业 — 15%</option>
+        <option value="service">技术先进型服务企业 — 15%</option>
+        <option value="software">重点软件企业 / 集成电路企业 — 10%</option>
+        <option value="nonresident">非居民企业（预提所得税）— 10%</option>
       </select>
     </div>
   </div>
@@ -348,23 +352,30 @@ function calcScenario(revenue, typeRate, data) {
   const taxableIncome = accountingProfit + totalAdj;
 
   // 税率
-  let taxRate = parseFloat(typeRate);
+  let taxRate = 0;
   let taxPayable = 0;
-  if (typeRate === '5') {
+
+  if (typeRate === 'xw5') {
     // 小微 ≤100万利润
     taxRate = 5;
     const mini = Math.min(taxableIncome, 1000000);
     const rest = Math.max(0, taxableIncome - 1000000);
     taxPayable = mini * 0.05 + rest * 0.10;
-  } else if (typeRate === '10') {
+  } else if (typeRate === 'xw10') {
     // 小微 100~300万
     taxRate = 10;
     const mini = Math.min(taxableIncome, 1000000);
     const rest = Math.max(0, taxableIncome - 1000000);
     taxPayable = mini * 0.05 + rest * 0.10;
-  } else {
-    taxRate = parseFloat(typeRate) / 100;
-    taxPayable = taxableIncome * taxRate;
+  } else if (typeRate === '25') {
+    taxRate = 25;
+    taxPayable = taxableIncome * 0.25;
+  } else if (typeRate === 'hightech' || typeRate === 'west' || typeRate === 'service') {
+    taxRate = 15;
+    taxPayable = taxableIncome * 0.15;
+  } else if (typeRate === 'software' || typeRate === 'nonresident') {
+    taxRate = 10;
+    taxPayable = taxableIncome * 0.10;
   }
 
   return {
