@@ -379,7 +379,7 @@ function calcScenario(revenue, data) {
 
   return {
     adjustments, totalActual, totalDeduction, totalAdj,
-    accountingProfit, taxableIncome, taxRate: taxRate * 100,
+    accountingProfit, taxableIncome, taxRate: taxRate,
     taxPayable, effectiveRate: taxableIncome > 0 ? (taxPayable / taxableIncome * 100) : 0,
     typeKey: typeRate
   };
