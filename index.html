@@ -82,7 +82,7 @@
   }
   .input-table .scenario-actions button:hover { color: #922b21; }
   .input-table input {
-    width: 80px; padding: 5px 8px; border: 1px solid var(--border);
+    width: 110px; padding: 5px 8px; border: 1px solid var(--border);
     border-radius: 4px; font-size: 13px; text-align: right; background: #faf9f6;
   }
   .input-table input:focus {
@@ -137,7 +137,7 @@
     .header h1 { font-size: 22px; }
     .input-table { font-size: 12px; }
     .input-table th, .input-table td { padding: 5px 6px; }
-    .input-table input { width: 60px; font-size: 12px; padding: 4px 6px; }
+    .input-table input { width: 70px; font-size: 12px; padding: 4px 6px; }
     .input-table th:first-child { min-width: 80px; }
     .form-row { gap: 8px; }
     .form-row input, .form-row select { width: 120px; }
@@ -145,7 +145,7 @@
     .result-table th, .result-table td { padding: 5px 6px; }
   }
   @media (max-width: 480px) {
-    .input-table input { width: 50px; font-size: 11px; padding: 3px 4px; }
+    .input-table input { width: 60px; font-size: 11px; padding: 3px 4px; }
     .input-table th:first-child { min-width: 60px; font-size: 11px; }
     .input-table th, .input-table td { padding: 4px 3px; }
   }
@@ -170,8 +170,8 @@
     <h2>基本信息</h2>
     <div class="form-row">
       <label>营业收入</label>
-      <input type="number" id="revenue" value="500" step="1" min="0">
-      <span class="unit">万元</span>
+      <input type="number" id="revenue" value="5000000" step="1" min="0">
+      <span class="unit">元</span>
     </div>
     <div class="form-row">
       <label>企业类型</label>
@@ -188,7 +188,7 @@
   <div class="card">
     <h2>成本费用录入</h2>
     <p style="font-size:12px;color:var(--text-light);margin-bottom:10px;">
-      每个方案对应一套成本结构。填入各费用项目金额（单位：万元），自动计算纳税调整与税负差异。
+      每个方案对应一套成本结构。填入各费用项目金额（单位：元），自动计算纳税调整与税负差异。
     </p>
     <div class="actions">
       <button class="btn btn-primary btn-sm" onclick="addScenario()">+ 添加方案</button>
@@ -280,10 +280,10 @@ const EXPENSE_ITEMS = [
 
 let scenarios = ['方案1', '方案2'];
 let scenarioDefaults = [
-  { salary:120, social:25, welfare:20, education:6, union:3, entertainment:15,
-    advertising:30, travel:8, office:5, donation:10, depreciation:15, other:20 },
-  { salary:130, social:28, welfare:18, education:5, union:2, entertainment:10,
-    advertising:25, travel:10, office:6, donation:8, depreciation:18, other:25 },
+  { salary:1200000, social:250000, welfare:200000, education:60000, union:30000, entertainment:150000,
+    advertising:300000, travel:80000, office:50000, donation:100000, depreciation:150000, other:200000 },
+  { salary:1300000, social:280000, welfare:180000, education:50000, union:20000, entertainment:100000,
+    advertising:250000, travel:100000, office:60000, donation:80000, depreciation:180000, other:250000 },
 ];
 let scenarioData = JSON.parse(JSON.stringify(scenarioDefaults));
 
@@ -353,14 +353,14 @@ function calcScenario(revenue, typeRate, data) {
   if (typeRate === '5') {
     // 小微 ≤100万利润
     taxRate = 5;
-    const mini = Math.min(taxableIncome, 100);
-    const rest = Math.max(0, taxableIncome - 100);
+    const mini = Math.min(taxableIncome, 1000000);
+    const rest = Math.max(0, taxableIncome - 1000000);
     taxPayable = mini * 0.05 + rest * 0.10;
   } else if (typeRate === '10') {
     // 小微 100~300万
     taxRate = 10;
-    const mini = Math.min(taxableIncome, 100);
-    const rest = Math.max(0, taxableIncome - 100);
+    const mini = Math.min(taxableIncome, 1000000);
+    const rest = Math.max(0, taxableIncome - 1000000);
     taxPayable = mini * 0.05 + rest * 0.10;
   } else {
     taxRate = parseFloat(typeRate) / 100;
@@ -413,7 +413,7 @@ function render() {
         render();
       };
       td.appendChild(inp);
-      td.appendChild(document.createTextNode(' 万'));
+      td.appendChild(document.createTextNode(' 元'));
       tr.appendChild(td);
     }
     body.appendChild(tr);
@@ -438,33 +438,34 @@ function render() {
   const rBody = document.getElementById('resultBody');
   rBody.innerHTML = '';
 
-  function addResultRow(label, values, cls, fmt = true) {
+  function fmt(n) { return Number(n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+  function addResultRow(label, values, cls, fmtFlag = true) {
     const tr = document.createElement('tr');
     if (cls) tr.className = cls;
     tr.innerHTML = `<td>${label}</td>`;
     for (let i = 0; i < sCount; i++) {
       const td = document.createElement('td');
       let v = values[i];
-      if (fmt) {
-        // Diff highlight
+      if (fmtFlag) {
         const prev = i > 0 ? values[i-1] : null;
         if (prev !== null && v !== prev) {
           td.style.color = '#c0392b';
         }
       }
-      td.textContent = typeof v === 'number' ? v.toFixed(2) : v;
+      td.textContent = typeof v === 'number' ? fmt(v) : v;
       tr.appendChild(td);
     }
     rBody.appendChild(tr);
   }
 
-  addResultRow('实际支出总额（万元）', results.map(r => r.totalActual));
-  addResultRow('纳税调增金额（万元）', results.map(r => r.totalAdj));
-  addResultRow('会计利润（万元）', results.map(r => r.accountingProfit));
-  addResultRow('应纳税所得额（万元）', results.map(r => r.taxableIncome));
+  addResultRow('实际支出总额（元）', results.map(r => r.totalActual));
+  addResultRow('纳税调增金额（元）', results.map(r => r.totalAdj));
+  addResultRow('会计利润（元）', results.map(r => r.accountingProfit));
+  addResultRow('应纳税所得额（元）', results.map(r => r.taxableIncome));
   rBody.insertAdjacentHTML('beforeend', `<tr style="height:6px;background:transparent;border:none;"><td colspan="${sCount+1}" style="border:none;padding:0;"></td></tr>`);
   addResultRow('适用税率', results.map(r => r.taxRate.toFixed(1) + '%'), 'tax-row', false);
-  addResultRow('应交企业所得税（万元）', results.map(r => r.taxPayable), 'tax-row');
+  addResultRow('应交企业所得税（元）', results.map(r => r.taxPayable), 'tax-row');
   addResultRow('实际税负率', results.map(r => r.effectiveRate.toFixed(1) + '%'), 'tax-row', false);
 
   // --- 详细调整明细 ---
@@ -489,9 +490,9 @@ function render() {
     tr.innerHTML = `<td>${item.name}</td>`;
     for (let i = 0; i < sCount; i++) {
       const adj = results[i].adjustments[item.id];
-      tr.innerHTML += `<td>${adj.actual.toFixed(1)}</td>`;
-      tr.innerHTML += `<td>${adj.deduction.toFixed(1)}</td>`;
-      tr.innerHTML += `<td class="${adj.adj > 0 ? 'pos' : 'neg'}">${adj.adj.toFixed(1)}</td>`;
+      tr.innerHTML += `<td>${fmt(adj.actual)}</td>`;
+      tr.innerHTML += `<td>${fmt(adj.deduction)}</td>`;
+      tr.innerHTML += `<td class="${adj.adj > 0 ? 'pos' : 'neg'}">${fmt(adj.adj)}</td>`;
     }
     dBody.appendChild(tr);
   }
@@ -505,9 +506,9 @@ function render() {
     const totalAct = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].actual, 0);
     const totalDed = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].deduction, 0);
     const totalAdj = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].adj, 0);
-    sumTr.innerHTML += `<td>${totalAct.toFixed(1)}</td>`;
-    sumTr.innerHTML += `<td>${totalDed.toFixed(1)}</td>`;
-    sumTr.innerHTML += `<td class="pos">${totalAdj.toFixed(1)}</td>`;
+    sumTr.innerHTML += `<td>${fmt(totalAct)}</td>`;
+    sumTr.innerHTML += `<td>${fmt(totalDed)}</td>`;
+    sumTr.innerHTML += `<td class="pos">${fmt(totalAdj)}</td>`;
   }
   dBody.appendChild(sumTr);
 }
