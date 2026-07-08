@@ -280,12 +280,10 @@ const EXPENSE_ITEMS = [
   { id:'other',          name:'其他成本',     rule:'全额扣除（需合理凭证）',  depends:[] },
 ];
 
-let scenarios = ['方案1', '方案2'];
+let scenarios = ['方案1'];
 let scenarioDefaults = [
   { enterpriseType:'25', salary:1200000, social:250000, welfare:200000, education:60000, union:30000, entertainment:150000,
     advertising:300000, travel:80000, office:50000, donation:100000, depreciation:150000, other:200000 },
-  { enterpriseType:'hightech', salary:1300000, social:280000, welfare:180000, education:50000, union:20000, entertainment:100000,
-    advertising:250000, travel:100000, office:60000, donation:80000, depreciation:180000, other:250000 },
 ];
 let scenarioData = JSON.parse(JSON.stringify(scenarioDefaults));
 
@@ -385,37 +383,31 @@ function calcScenario(revenue, data) {
   };
 }
 
-// ========== 渲染 ==========
-function render() {
-  const revenue = parseFloat(document.getElementById('revenue').value) || 0;
+// ========== 构建输入表格（只建一次） ==========
+const typeOptions = [
+  { v:'25', l:'一般企业 25%' },
+  { v:'hightech', l:'高新技术企业 15%' },
+  { v:'xw5', l:'小微企业(≤100万利润) 约5%' },
+  { v:'xw10', l:'小微企业(100~300万利润) 约10%' },
+  { v:'west', l:'西部大开发鼓励类 15%' },
+  { v:'service', l:'技术先进型服务企业 15%' },
+  { v:'software', l:'重点软件/集成电路企业 10%' },
+  { v:'nonresident', l:'非居民企业(预提) 10%' },
+];
 
+function buildInputs() {
   const sCount = scenarios.length;
-
-  // 企业类型选项模板
-  const typeOptions = [
-    { v:'25', l:'一般企业 25%' },
-    { v:'hightech', l:'高新技术企业 15%' },
-    { v:'xw5', l:'小微企业(≤100万利润) 约5%' },
-    { v:'xw10', l:'小微企业(100~300万利润) 约10%' },
-    { v:'west', l:'西部大开发鼓励类 15%' },
-    { v:'service', l:'技术先进型服务企业 15%' },
-    { v:'software', l:'重点软件/集成电路企业 10%' },
-    { v:'nonresident', l:'非居民企业(预提) 10%' },
-  ];
-
-  // --- 录入表头 ---
   const header = document.getElementById('inputHeader');
   header.innerHTML = '<th>费用项目</th>';
   for (let i = 0; i < sCount; i++) {
     const th = document.createElement('th');
-    th.className = 'scenario-name';
-    th.style.cssText = 'text-align:center;';
-    th.innerHTML = scenarios[i] + ' ' +
-      (sCount > 2 ? `<span class="scenario-actions"><button onclick="removeScenario(${i})" title="删除此方案">✕</button></span>` : '');
+    th.style.textAlign = 'center';
+    th.innerHTML = scenarios[i] + (sCount > 1
+      ? ` <span class="scenario-actions"><button onclick="removeScenario(${i})" title="删除此方案">✕</button></span>`
+      : '');
     header.appendChild(th);
   }
 
-  // --- 录入内容 ---
   const body = document.getElementById('inputBody');
   body.innerHTML = '';
 
@@ -426,9 +418,7 @@ function render() {
   for (let i = 0; i < sCount; i++) {
     const td = document.createElement('td');
     const sel = document.createElement('select');
-    sel.style.width = '160px'; sel.style.padding = '5px 6px';
-    sel.style.fontSize = '12px'; sel.style.borderRadius = '4px';
-    sel.style.border = '1px solid var(--border)'; sel.style.background = '#faf9f6';
+    sel.style.cssText = 'width:160px;padding:5px 6px;font-size:12px;border-radius:4px;border:1px solid var(--border);background:#faf9f6;';
     for (const opt of typeOptions) {
       const o = document.createElement('option');
       o.value = opt.v; o.textContent = opt.l;
@@ -437,7 +427,7 @@ function render() {
     }
     sel.onchange = function() {
       scenarioData[i].enterpriseType = this.value;
-      render();
+      recalcResults();
     };
     td.appendChild(sel);
     typeTr.appendChild(td);
@@ -453,13 +443,13 @@ function render() {
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.inputMode = 'numeric';
-      inp.style.textAlign = 'right';
+      inp.style.cssText = 'width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;text-align:right;background:#faf9f6;-moz-appearance:textfield;';
       inp.value = scenarioData[i][item.id] || 0;
       inp.dataset.scenario = i;
       inp.dataset.item = item.id;
       inp.onchange = function() {
         scenarioData[parseInt(this.dataset.scenario)][this.dataset.item] = parseFloat(this.value) || 0;
-        render();
+        recalcResults();
       };
       td.appendChild(inp);
       td.appendChild(document.createTextNode(' 元'));
@@ -468,13 +458,27 @@ function render() {
     body.appendChild(tr);
   }
 
-  // --- 计算结果 ---
+  recalcResults();
+}
+
+// ========== 刷新结果（不重建输入框） ==========
+function recalcResults() {
+  const revenue = parseFloat(document.getElementById('revenue').value) || 0;
+  const sCount = scenarios.length;
   const results = [];
   for (let i = 0; i < sCount; i++) {
     results.push(calcScenario(revenue, scenarioData[i]));
   }
 
-  // --- 结果表头 ---
+  function fmt(n) { return Number(n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function typeLabel(v) {
+    const m = { '25':'一般企业 25%', 'hightech':'高新技术企业 15%', 'xw5':'小微企业(≤100万) 约5%',
+      'xw10':'小微企业(100~300万) 约10%', 'west':'西部大开发 15%', 'service':'技术先进型服务企业 15%',
+      'software':'重点软件/集成电路 10%', 'nonresident':'非居民企业 10%' };
+    return m[v] || v;
+  }
+
+  // 结果表头
   const rHeader = document.getElementById('resultHeader');
   rHeader.innerHTML = '<th>项目</th>';
   for (let i = 0; i < sCount; i++) {
@@ -483,18 +487,9 @@ function render() {
     rHeader.appendChild(th);
   }
 
-  // --- 结果内容 ---
+  // 结果内容
   const rBody = document.getElementById('resultBody');
   rBody.innerHTML = '';
-
-  function fmt(n) { return Number(n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-
-  function typeLabel(v) {
-    const m = { '25':'一般企业 25%', 'hightech':'高新技术企业 15%', 'xw5':'小微企业(≤100万) 约5%',
-      'xw10':'小微企业(100~300万) 约10%', 'west':'西部大开发 15%', 'service':'技术先进型服务企业 15%',
-      'software':'重点软件/集成电路 10%', 'nonresident':'非居民企业 10%' };
-    return m[v] || v;
-  }
 
   function addResultRow(label, values, cls, fmtFlag = true) {
     const tr = document.createElement('tr');
@@ -505,9 +500,7 @@ function render() {
       let v = values[i];
       if (fmtFlag) {
         const prev = i > 0 ? values[i-1] : null;
-        if (prev !== null && v !== prev) {
-          td.style.color = '#c0392b';
-        }
+        if (prev !== null && v !== prev) td.style.color = '#c0392b';
       }
       td.textContent = typeof v === 'number' ? fmt(v) : v;
       tr.appendChild(td);
@@ -515,92 +508,74 @@ function render() {
     rBody.appendChild(tr);
   }
 
-  // 企业类型行
   addResultRow('企业类型', results.map(r => typeLabel(r.typeKey)), 'total-row', false);
-  // 分隔
   addResultRow('实际支出总额（元）', results.map(r => r.totalActual));
   addResultRow('应纳税所得额 / 纳税基数（元）', results.map(r => r.taxableIncome));
-  // 税负核心区
   rBody.insertAdjacentHTML('beforeend', `<tr style="height:6px;background:transparent;border:none;"><td colspan="${sCount+1}" style="border:none;padding:0;"></td></tr>`);
   addResultRow('▶ 适用税率', results.map(r => r.taxRate.toFixed(1) + '%'), 'tax-row', false);
   addResultRow('▶ 应交企业所得税（元）', results.map(r => r.taxPayable), 'tax-row');
   addResultRow('▶ 税后净利润（元）', results.map(r => r.taxableIncome - r.taxPayable), 'tax-row');
   addResultRow('▶ 实际税负率', results.map(r => r.effectiveRate.toFixed(1) + '%'), 'tax-row', false);
 
-  // --- 详细调整明细 ---
+  // 详细调整明细
   const dHeader = document.getElementById('detailHeader');
   dHeader.innerHTML = '<th>费用项目</th>';
   for (let i = 0; i < sCount; i++) {
-    const th1 = document.createElement('th');
-    th1.textContent = scenarios[i] + ' 实际';
-    dHeader.appendChild(th1);
-    const th2 = document.createElement('th');
-    th2.textContent = scenarios[i] + ' 可扣';
-    dHeader.appendChild(th2);
-    const th3 = document.createElement('th');
-    th3.textContent = scenarios[i] + ' 调增';
-    dHeader.appendChild(th3);
+    dHeader.innerHTML += `<th>${scenarios[i]} 实际</th><th>${scenarios[i]} 可扣</th><th>${scenarios[i]} 调增</th>`;
   }
 
   const dBody = document.getElementById('detailBody');
   dBody.innerHTML = '';
   for (const item of EXPENSE_ITEMS) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${item.name}</td>`;
+    let html = `<td>${item.name}</td>`;
     for (let i = 0; i < sCount; i++) {
       const adj = results[i].adjustments[item.id];
-      tr.innerHTML += `<td>${fmt(adj.actual)}</td>`;
-      tr.innerHTML += `<td>${fmt(adj.deduction)}</td>`;
-      tr.innerHTML += `<td class="${adj.adj > 0 ? 'pos' : 'neg'}">${fmt(adj.adj)}</td>`;
+      html += `<td>${fmt(adj.actual)}</td><td>${fmt(adj.deduction)}</td><td class="${adj.adj > 0 ? 'pos' : 'neg'}">${fmt(adj.adj)}</td>`;
     }
-    dBody.appendChild(tr);
+    dBody.insertAdjacentHTML('beforeend', `<tr>${html}</tr>`);
   }
 
-  // 汇总之行
-  const sumTr = document.createElement('tr');
-  sumTr.className = 'total-row';
-  sumTr.innerHTML = '<td>合计</td>';
+  // 汇总行
+  let sumHtml = '<td>合计</td>';
   for (let i = 0; i < sCount; i++) {
     const adj = results[i].adjustments;
     const totalAct = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].actual, 0);
     const totalDed = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].deduction, 0);
     const totalAdj = EXPENSE_ITEMS.reduce((s, it) => s + adj[it.id].adj, 0);
-    sumTr.innerHTML += `<td>${fmt(totalAct)}</td>`;
-    sumTr.innerHTML += `<td>${fmt(totalDed)}</td>`;
-    sumTr.innerHTML += `<td class="pos">${fmt(totalAdj)}</td>`;
+    sumHtml += `<td>${fmt(totalAct)}</td><td>${fmt(totalDed)}</td><td class="pos">${fmt(totalAdj)}</td>`;
   }
-  dBody.appendChild(sumTr);
+  dBody.insertAdjacentHTML('beforeend', `<tr class="total-row">${sumHtml}</tr>`);
 }
 
 // ========== 交互 ==========
 function addScenario() {
-  const n = scenarios.length;
-  if (n >= 4) { alert('最多支持4个方案对比'); return; }
-  const name = '方案' + (n + 1);
-  scenarios.push(name);
-  scenarioData.push(JSON.parse(JSON.stringify(scenarioDefaults[0])));
-  render();
+  if (scenarios.length >= 4) { alert('最多支持4个方案对比'); return; }
+  const n = scenarios.length + 1;
+  scenarios.push('方案' + n);
+  // 复制第一个方案的数值作为新方案的起点
+  scenarioData.push(JSON.parse(JSON.stringify(scenarioData[0])));
+  buildInputs();
 }
 
 function removeScenario(idx) {
-  if (scenarios.length <= 2) { alert('至少保留2个方案'); return; }
+  if (scenarios.length <= 1) { alert('至少保留1个方案'); return; }
   scenarios.splice(idx, 1);
   scenarioData.splice(idx, 1);
-  render();
+  buildInputs();
 }
 
 function toggleDetail() {
   const sec = document.getElementById('detailSection');
   sec.classList.toggle('show');
-  const toggle = document.querySelector('.detail-toggle');
-  toggle.textContent = sec.classList.contains('show') ? '▾ 收起明细' : '▸ 查看每项费用纳税调整明细';
+  document.querySelector('.detail-toggle').textContent =
+    sec.classList.contains('show') ? '▾ 收起明细' : '▸ 查看每项费用纳税调整明细';
 }
 
-// ========== 实时更新 ==========
-document.getElementById('revenue').addEventListener('input', render);
+// ========== 实时更新（只有营收触发，不重建输入） ==========
+document.getElementById('revenue').addEventListener('input', recalcResults);
 
 // ========== 初始化 ==========
-render();
+buildInputs();
 </script>
 </body>
 </html>
