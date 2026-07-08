@@ -57,7 +57,10 @@
   .form-row input, .form-row select {
     width: 160px; padding: 8px 12px; border: 1px solid var(--border);
     border-radius: 6px; font-size: 14px; background: #faf9f6; transition: border .2s;
+    -moz-appearance: textfield;
   }
+  .form-row input::-webkit-inner-spin-button,
+  .form-row input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .form-row input:focus, .form-row select:focus {
     outline: none; border-color: var(--green); background: #fff;
   }
@@ -84,7 +87,10 @@
   .input-table input {
     width: 110px; padding: 5px 8px; border: 1px solid var(--border);
     border-radius: 4px; font-size: 13px; text-align: right; background: #faf9f6;
+    -moz-appearance: textfield;
   }
+  .input-table input::-webkit-inner-spin-button,
+  .input-table input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .input-table input:focus {
     outline: none; border-color: var(--green); background: #fff;
   }
@@ -173,19 +179,6 @@
       <input type="number" id="revenue" value="5000000" step="1" min="0">
       <span class="unit">元</span>
     </div>
-    <div class="form-row">
-      <label>企业类型</label>
-      <select id="enterpriseType">
-        <option value="25">一般企业 — 标准税率 25%</option>
-        <option value="hightech">高新技术企业 — 15%</option>
-        <option value="xw5">小型微利企业（年利润≤100万元）— 实际约 5%</option>
-        <option value="xw10">小型微利企业（年利润100~300万元）— 实际约 10%</option>
-        <option value="west">西部大开发鼓励类企业 — 15%</option>
-        <option value="service">技术先进型服务企业 — 15%</option>
-        <option value="software">重点软件企业 / 集成电路企业 — 10%</option>
-        <option value="nonresident">非居民企业（预提所得税）— 10%</option>
-      </select>
-    </div>
   </div>
 
   <!-- 费用录入 -->
@@ -261,7 +254,12 @@
     · 业务招待费上限 = min(实际×60%, 营业收入×5‰) &nbsp;|&nbsp;
     广告宣传费上限 = 营业收入×15%<br>
     · 捐赠支出上限 = 会计利润 × 12% &nbsp;|&nbsp;
-    差旅费、办公费、折旧摊销、其他成本：全额扣除（需合理凭证）
+    差旅费、办公费、折旧摊销、其他成本：全额扣除（需合理凭证）<br><br>
+    <strong>📊 各档位纳税基数与税率：</strong><br>
+    · 一般企业：应纳税所得额 × 25%<br>
+    · 高新技术企业 / 西部大开发鼓励类 / 技术先进型服务企业：应纳税所得额 × 15%<br>
+    · 重点软件企业 / 集成电路企业 / 非居民企业：应纳税所得额 × 10%<br>
+    · 小型微利企业（年应纳税所得额≤300万元）：≤100万元部分实际约5%（按20%税率×25%计入），100~300万元部分实际约10%（按20%税率×50%计入）；超过300万元部分按25%全额征收
   </div>
 </div>
 
@@ -284,15 +282,16 @@ const EXPENSE_ITEMS = [
 
 let scenarios = ['方案1', '方案2'];
 let scenarioDefaults = [
-  { salary:1200000, social:250000, welfare:200000, education:60000, union:30000, entertainment:150000,
+  { enterpriseType:'25', salary:1200000, social:250000, welfare:200000, education:60000, union:30000, entertainment:150000,
     advertising:300000, travel:80000, office:50000, donation:100000, depreciation:150000, other:200000 },
-  { salary:1300000, social:280000, welfare:180000, education:50000, union:20000, entertainment:100000,
+  { enterpriseType:'hightech', salary:1300000, social:280000, welfare:180000, education:50000, union:20000, entertainment:100000,
     advertising:250000, travel:100000, office:60000, donation:80000, depreciation:180000, other:250000 },
 ];
 let scenarioData = JSON.parse(JSON.stringify(scenarioDefaults));
 
 // ========== 计算逻辑 ==========
-function calcScenario(revenue, typeRate, data) {
+function calcScenario(revenue, data) {
+  const typeRate = data.enterpriseType || '25';
   const actual = {};
   for (const item of EXPENSE_ITEMS) {
     actual[item.id] = parseFloat(data[item.id]) || 0;
@@ -381,16 +380,28 @@ function calcScenario(revenue, typeRate, data) {
   return {
     adjustments, totalActual, totalDeduction, totalAdj,
     accountingProfit, taxableIncome, taxRate: taxRate * 100,
-    taxPayable, effectiveRate: taxableIncome > 0 ? (taxPayable / taxableIncome * 100) : 0
+    taxPayable, effectiveRate: taxableIncome > 0 ? (taxPayable / taxableIncome * 100) : 0,
+    typeKey: typeRate
   };
 }
 
 // ========== 渲染 ==========
 function render() {
   const revenue = parseFloat(document.getElementById('revenue').value) || 0;
-  const typeRate = document.getElementById('enterpriseType').value;
 
   const sCount = scenarios.length;
+
+  // 企业类型选项模板
+  const typeOptions = [
+    { v:'25', l:'一般企业 25%' },
+    { v:'hightech', l:'高新技术企业 15%' },
+    { v:'xw5', l:'小微企业(≤100万利润) 约5%' },
+    { v:'xw10', l:'小微企业(100~300万利润) 约10%' },
+    { v:'west', l:'西部大开发鼓励类 15%' },
+    { v:'service', l:'技术先进型服务企业 15%' },
+    { v:'software', l:'重点软件/集成电路企业 10%' },
+    { v:'nonresident', l:'非居民企业(预提) 10%' },
+  ];
 
   // --- 录入表头 ---
   const header = document.getElementById('inputHeader');
@@ -407,6 +418,33 @@ function render() {
   // --- 录入内容 ---
   const body = document.getElementById('inputBody');
   body.innerHTML = '';
+
+  // 企业类型行
+  const typeTr = document.createElement('tr');
+  typeTr.style.background = '#f0f7f0';
+  typeTr.innerHTML = '<td style="font-weight:600;">企业类型<br><span style="font-size:11px;color:#999;">选择后税率自动切换</span></td>';
+  for (let i = 0; i < sCount; i++) {
+    const td = document.createElement('td');
+    const sel = document.createElement('select');
+    sel.style.width = '160px'; sel.style.padding = '5px 6px';
+    sel.style.fontSize = '12px'; sel.style.borderRadius = '4px';
+    sel.style.border = '1px solid var(--border)'; sel.style.background = '#faf9f6';
+    for (const opt of typeOptions) {
+      const o = document.createElement('option');
+      o.value = opt.v; o.textContent = opt.l;
+      if (scenarioData[i].enterpriseType === opt.v) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.onchange = function() {
+      scenarioData[i].enterpriseType = this.value;
+      render();
+    };
+    td.appendChild(sel);
+    typeTr.appendChild(td);
+  }
+  body.appendChild(typeTr);
+
+  // 费用项目行
   for (const item of EXPENSE_ITEMS) {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${item.name}<br><span style="font-size:11px;color:#999;">${item.rule}</span></td>`;
@@ -433,7 +471,7 @@ function render() {
   // --- 计算结果 ---
   const results = [];
   for (let i = 0; i < sCount; i++) {
-    results.push(calcScenario(revenue, typeRate, scenarioData[i]));
+    results.push(calcScenario(revenue, scenarioData[i]));
   }
 
   // --- 结果表头 ---
@@ -450,6 +488,13 @@ function render() {
   rBody.innerHTML = '';
 
   function fmt(n) { return Number(n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+  function typeLabel(v) {
+    const m = { '25':'一般企业 25%', 'hightech':'高新技术企业 15%', 'xw5':'小微企业(≤100万) 约5%',
+      'xw10':'小微企业(100~300万) 约10%', 'west':'西部大开发 15%', 'service':'技术先进型服务企业 15%',
+      'software':'重点软件/集成电路 10%', 'nonresident':'非居民企业 10%' };
+    return m[v] || v;
+  }
 
   function addResultRow(label, values, cls, fmtFlag = true) {
     const tr = document.createElement('tr');
@@ -470,14 +515,17 @@ function render() {
     rBody.appendChild(tr);
   }
 
+  // 企业类型行
+  addResultRow('企业类型', results.map(r => typeLabel(r.typeKey)), 'total-row', false);
+  // 分隔
   addResultRow('实际支出总额（元）', results.map(r => r.totalActual));
   addResultRow('纳税调增金额（元）', results.map(r => r.totalAdj));
-  addResultRow('会计利润（元）', results.map(r => r.accountingProfit));
-  addResultRow('应纳税所得额（元）', results.map(r => r.taxableIncome));
+  addResultRow('应纳税所得额 / 纳税基数（元）', results.map(r => r.taxableIncome));
+  // 税负核心区
   rBody.insertAdjacentHTML('beforeend', `<tr style="height:6px;background:transparent;border:none;"><td colspan="${sCount+1}" style="border:none;padding:0;"></td></tr>`);
-  addResultRow('适用税率', results.map(r => r.taxRate.toFixed(1) + '%'), 'tax-row', false);
-  addResultRow('应交企业所得税（元）', results.map(r => r.taxPayable), 'tax-row');
-  addResultRow('实际税负率', results.map(r => r.effectiveRate.toFixed(1) + '%'), 'tax-row', false);
+  addResultRow('▶ 适用税率', results.map(r => r.taxRate.toFixed(1) + '%'), 'tax-row', false);
+  addResultRow('▶ 应交企业所得税（元）', results.map(r => r.taxPayable), 'tax-row');
+  addResultRow('▶ 实际税负率', results.map(r => r.effectiveRate.toFixed(1) + '%'), 'tax-row', false);
 
   // --- 详细调整明细 ---
   const dHeader = document.getElementById('detailHeader');
@@ -550,7 +598,6 @@ function toggleDetail() {
 
 // ========== 实时更新 ==========
 document.getElementById('revenue').addEventListener('input', render);
-document.getElementById('enterpriseType').addEventListener('change', render);
 
 // ========== 初始化 ==========
 render();
