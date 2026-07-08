@@ -254,7 +254,9 @@
     · 业务招待费上限 = min(实际×60%, 营业收入×5‰) &nbsp;|&nbsp;
     广告宣传费上限 = 营业收入×15%<br>
     · 捐赠支出上限 = 会计利润 × 12% &nbsp;|&nbsp;
-    差旅费、办公费、折旧摊销、其他成本：全额扣除（需合理凭证）<br><br>
+    主营业务税金及附加、资产减值损失、营业外支出、差旅费、办公费、折旧摊销、其他成本：全额扣除（需合理凭证）<br>
+    · 营业外收入：计入收入总额增加应纳税所得额<br>
+    · 以前年度亏损：可在税前弥补，最长结转5年，不超过当年应纳税所得额<br><br>
     <strong>📊 各档位纳税基数与税率：</strong><br>
     · 一般企业：应纳税所得额 × 25%<br>
     · 高新技术企业 / 西部大开发鼓励类 / 技术先进型服务企业：应纳税所得额 × 15%<br>
@@ -277,26 +279,34 @@ const EXPENSE_ITEMS = [
   { id:'office',         name:'办公费',       rule:'全额扣除',               depends:[] },
   { id:'donation',       name:'捐赠支出',     rule:'≤利润12%',              depends:[], usesProfit:true },
   { id:'depreciation',   name:'折旧摊销',     rule:'全额扣除（税法标准）',   depends:[] },
+  { id:'taxSurcharge',   name:'主营业务税金及附加', rule:'全额扣除',         depends:[] },
+  { id:'assetImpairment',name:'资产减值损失', rule:'实际发生才可扣除',       depends:[] },
+  { id:'nonopExpense',   name:'营业外支出',   rule:'全额扣除（需合理凭证）',  depends:[] },
   { id:'other',          name:'其他成本',     rule:'全额扣除（需合理凭证）',  depends:[] },
 ];
 
 let scenarios = ['方案1'];
 let scenarioDefaults = [
   { enterpriseType:'25', salary:1200000, social:250000, welfare:200000, education:60000, union:30000, entertainment:150000,
-    advertising:300000, travel:80000, office:50000, donation:100000, depreciation:150000, other:200000 },
+    advertising:300000, travel:80000, office:50000, donation:100000, depreciation:150000,
+    taxSurcharge:20000, assetImpairment:10000, nonopExpense:15000, nonopIncome:30000, priorYearLoss:0, other:200000 },
 ];
 let scenarioData = JSON.parse(JSON.stringify(scenarioDefaults));
 
 // ========== 计算逻辑 ==========
 function calcScenario(revenue, data) {
   const typeRate = data.enterpriseType || '25';
+  const nonopIncome = parseFloat(data.nonopIncome) || 0;
+  const priorLoss = parseFloat(data.priorYearLoss) || 0;
+  const totalRevenue = revenue + nonopIncome;
   const actual = {};
   for (const item of EXPENSE_ITEMS) {
     actual[item.id] = parseFloat(data[item.id]) || 0;
   }
 
   // 1. 全额扣除项（无限制）
-  const fullDeductIds = ['salary','social','travel','office','depreciation','other'];
+  const fullDeductIds = ['salary','social','travel','office','depreciation','other',
+                         'taxSurcharge','assetImpairment','nonopExpense'];
   const adjustments = {};
   for (const id of fullDeductIds) {
     adjustments[id] = { actual: actual[id], limit: actual[id], deduction: actual[id], adj: 0 };
@@ -318,24 +328,24 @@ function calcScenario(revenue, data) {
   // 3. 业务招待费
   const ent = actual.entertainment;
   const entLimit1 = ent * 0.6;
-  const entLimit2 = revenue * 0.005;
+  const entLimit2 = totalRevenue * 0.005;
   const entLimit = Math.min(entLimit1, entLimit2);
   const entDeduction = Math.min(ent, entLimit);
   adjustments.entertainment = { actual: ent, limit: entLimit, deduction: entDeduction, adj: ent - entDeduction };
 
   // 4. 广告宣传费
   const adv = actual.advertising;
-  const advLimit = revenue * 0.15;
+  const advLimit = totalRevenue * 0.15;
   const advDeduction = Math.min(adv, advLimit);
   adjustments.advertising = { actual: adv, limit: advLimit, deduction: advDeduction, adj: adv - advDeduction };
 
   // 5. 捐赠支出（需迭代：利润取决于捐赠，捐赠上限取决于利润）
   const dont = actual.donation;
   const otherExpenses = EXPENSE_ITEMS.filter(i => i.id !== 'donation').reduce((s, i) => s + (actual[i.id]||0), 0);
-  let profit = revenue - otherExpenses - dont;
+  let profit = totalRevenue - otherExpenses - dont;
   let donationLimit = 0;
   for (let iter = 0; iter < 5; iter++) {
-    profit = revenue - otherExpenses - (dont > 0 ? Math.min(dont, donationLimit) : 0);
+    profit = totalRevenue - otherExpenses - (dont > 0 ? Math.min(dont, donationLimit) : 0);
     donationLimit = Math.max(0, profit * 0.12);
   }
   const donationDeduction = Math.min(dont, donationLimit);
@@ -345,8 +355,8 @@ function calcScenario(revenue, data) {
   const totalActual = EXPENSE_ITEMS.reduce((s, i) => s + adjustments[i.id].actual, 0);
   const totalDeduction = EXPENSE_ITEMS.reduce((s, i) => s + adjustments[i.id].deduction, 0);
   const totalAdj = EXPENSE_ITEMS.reduce((s, i) => s + adjustments[i.id].adj, 0);
-  const accountingProfit = revenue - totalActual;
-  const taxableIncome = accountingProfit + totalAdj;
+  const accountingProfit = totalRevenue - totalActual;
+  const taxableIncome = Math.max(0, accountingProfit + totalAdj - priorLoss);
 
   // 税率
   let taxRate = 0;
@@ -379,7 +389,7 @@ function calcScenario(revenue, data) {
     adjustments, totalActual, totalDeduction, totalAdj,
     accountingProfit, taxableIncome, taxRate: taxRate,
     taxPayable, effectiveRate: taxableIncome > 0 ? (taxPayable / taxableIncome * 100) : 0,
-    typeKey: typeRate
+    typeKey: typeRate, nonopIncome: nonopIncome, priorYearLoss: priorLoss
   };
 }
 
@@ -458,6 +468,46 @@ function buildInputs() {
     body.appendChild(tr);
   }
 
+  // --- 特殊项行：营业外收入 ---
+  const incTr = document.createElement('tr');
+  incTr.style.background = '#f7f0e0';
+  incTr.innerHTML = '<td style="font-weight:600;">营业外收入<br><span style="font-size:11px;color:#999;">加：其他业务外收入</span></td>';
+  for (let i = 0; i < sCount; i++) {
+    const td = document.createElement('td');
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'numeric';
+    inp.style.cssText = 'width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;text-align:right;background:#faf9f6;-moz-appearance:textfield;';
+    inp.value = scenarioData[i].nonopIncome || 0;
+    inp.oninput = function() {
+      scenarioData[i].nonopIncome = parseFloat(this.value) || 0;
+      recalcResults();
+    };
+    td.appendChild(inp);
+    td.appendChild(document.createTextNode(' 元'));
+    incTr.appendChild(td);
+  }
+  body.appendChild(incTr);
+
+  // --- 特殊项行：以前年度亏损 ---
+  const lossTr = document.createElement('tr');
+  lossTr.style.background = '#f0e8f7';
+  lossTr.innerHTML = '<td style="font-weight:600;">以前年度亏损<br><span style="font-size:11px;color:#999;">减：可在税前弥补的亏损（最长5年）</span></td>';
+  for (let i = 0; i < sCount; i++) {
+    const td = document.createElement('td');
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'numeric';
+    inp.style.cssText = 'width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;text-align:right;background:#faf9f6;-moz-appearance:textfield;';
+    inp.value = scenarioData[i].priorYearLoss || 0;
+    inp.oninput = function() {
+      scenarioData[i].priorYearLoss = parseFloat(this.value) || 0;
+      recalcResults();
+    };
+    td.appendChild(inp);
+    td.appendChild(document.createTextNode(' 元'));
+    lossTr.appendChild(td);
+  }
+  body.appendChild(lossTr);
+
   recalcResults();
 }
 
@@ -509,6 +559,8 @@ function recalcResults() {
   }
 
   addResultRow('企业类型', results.map(r => typeLabel(r.typeKey)), 'total-row', false);
+  addResultRow('营业收入（元）', results.map(r => revenue), 'total-row', false);
+  addResultRow('营业外收入（元）', results.map(r => r.nonopIncome || 0));
   addResultRow('实际支出总额（元）', results.map(r => r.totalActual));
   addResultRow('应纳税所得额 / 纳税基数（元）', results.map(r => r.taxableIncome));
   rBody.insertAdjacentHTML('beforeend', `<tr style="height:6px;background:transparent;border:none;"><td colspan="${sCount+1}" style="border:none;padding:0;"></td></tr>`);
