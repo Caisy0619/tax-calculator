@@ -519,12 +519,12 @@ function render() {
   addResultRow('企业类型', results.map(r => typeLabel(r.typeKey)), 'total-row', false);
   // 分隔
   addResultRow('实际支出总额（元）', results.map(r => r.totalActual));
-  addResultRow('纳税调增金额（元）', results.map(r => r.totalAdj));
   addResultRow('应纳税所得额 / 纳税基数（元）', results.map(r => r.taxableIncome));
   // 税负核心区
   rBody.insertAdjacentHTML('beforeend', `<tr style="height:6px;background:transparent;border:none;"><td colspan="${sCount+1}" style="border:none;padding:0;"></td></tr>`);
   addResultRow('▶ 适用税率', results.map(r => r.taxRate.toFixed(1) + '%'), 'tax-row', false);
   addResultRow('▶ 应交企业所得税（元）', results.map(r => r.taxPayable), 'tax-row');
+  addResultRow('▶ 税后净利润（元）', results.map(r => r.taxableIncome - r.taxPayable), 'tax-row');
   addResultRow('▶ 实际税负率', results.map(r => r.effectiveRate.toFixed(1) + '%'), 'tax-row', false);
 
   // --- 详细调整明细 ---
