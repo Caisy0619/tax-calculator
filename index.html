@@ -447,7 +447,7 @@ function buildInputs() {
       inp.value = scenarioData[i][item.id] || 0;
       inp.dataset.scenario = i;
       inp.dataset.item = item.id;
-      inp.onchange = function() {
+      inp.oninput = function() {
         scenarioData[parseInt(this.dataset.scenario)][this.dataset.item] = parseFloat(this.value) || 0;
         recalcResults();
       };
