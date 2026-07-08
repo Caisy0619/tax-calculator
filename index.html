@@ -261,7 +261,7 @@
     · 一般企业：应纳税所得额 × 25%<br>
     · 高新技术企业 / 西部大开发鼓励类 / 技术先进型服务企业：应纳税所得额 × 15%<br>
     · 重点软件企业 / 集成电路企业 / 非居民企业：应纳税所得额 × 10%<br>
-    · 小型微利企业（年应纳税所得额≤300万元）：≤100万元部分实际约5%（按20%税率×25%计入），100~300万元部分实际约10%（按20%税率×50%计入）；超过300万元部分按25%全额征收
+    · 小型微利企业：系统根据应纳税所得额自动匹配——≤100万元部分实际约5%，100~300万元部分实际约10%，超过300万元则不再满足小微条件，按25%征收
   </div>
 </div>
 
@@ -361,19 +361,28 @@ function calcScenario(revenue, data) {
   // 税率
   let taxRate = 0;
   let taxPayable = 0;
+  let typeDisplay = '';
 
-  if (typeRate === 'xw5') {
-    // 小微 ≤100万利润
-    taxRate = 5;
-    const mini = Math.min(taxableIncome, 1000000);
-    const rest = Math.max(0, taxableIncome - 1000000);
-    taxPayable = mini * 0.05 + rest * 0.10;
-  } else if (typeRate === 'xw10') {
-    // 小微 100~300万
-    taxRate = 10;
-    const mini = Math.min(taxableIncome, 1000000);
-    const rest = Math.max(0, taxableIncome - 1000000);
-    taxPayable = mini * 0.05 + rest * 0.10;
+  if (typeRate === 'xw') {
+    // 小微：按应纳税所得额自动匹配档次
+    if (taxableIncome <= 1000000) {
+      // ≤100万，实际约5%
+      taxRate = 5;
+      taxPayable = taxableIncome * 0.05;
+      typeDisplay = 'xw_lo';
+    } else if (taxableIncome <= 3000000) {
+      // 100~300万，分段计算
+      taxRate = 10;
+      const mini = Math.min(taxableIncome, 1000000);
+      const rest = taxableIncome - mini;
+      taxPayable = mini * 0.05 + rest * 0.10;
+      typeDisplay = 'xw_mid';
+    } else {
+      // 超过300万，不满足小微条件，按25%征收
+      taxRate = 25;
+      taxPayable = taxableIncome * 0.25;
+      typeDisplay = 'xw_hi';
+    }
   } else if (typeRate === '25') {
     taxRate = 25;
     taxPayable = taxableIncome * 0.25;
@@ -389,7 +398,8 @@ function calcScenario(revenue, data) {
     adjustments, totalActual, totalDeduction, totalAdj,
     accountingProfit, taxableIncome, taxRate: taxRate,
     taxPayable, effectiveRate: taxableIncome > 0 ? (taxPayable / taxableIncome * 100) : 0,
-    typeKey: typeRate, nonopIncome: nonopIncome, priorYearLoss: priorLoss
+    typeKey: typeRate, nonopIncome: nonopIncome, priorYearLoss: priorLoss,
+    typeDisplay: typeDisplay
   };
 }
 
@@ -397,8 +407,7 @@ function calcScenario(revenue, data) {
 const typeOptions = [
   { v:'25', l:'一般企业 25%' },
   { v:'hightech', l:'高新技术企业 15%' },
-  { v:'xw5', l:'小微企业(≤100万利润) 约5%' },
-  { v:'xw10', l:'小微企业(100~300万利润) 约10%' },
+  { v:'xw', l:'小型微利企业（自动匹配档次）' },
   { v:'west', l:'西部大开发鼓励类 15%' },
   { v:'service', l:'技术先进型服务企业 15%' },
   { v:'software', l:'重点软件/集成电路企业 10%' },
@@ -521,11 +530,17 @@ function recalcResults() {
   }
 
   function fmt(n) { return Number(n).toLocaleString('zh-CN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-  function typeLabel(v) {
-    const m = { '25':'一般企业 25%', 'hightech':'高新技术企业 15%', 'xw5':'小微企业(≤100万) 约5%',
-      'xw10':'小微企业(100~300万) 约10%', 'west':'西部大开发 15%', 'service':'技术先进型服务企业 15%',
+  function typeLabel(r) {
+    const m = { '25':'一般企业 25%', 'hightech':'高新技术企业 15%',
+      'west':'西部大开发 15%', 'service':'技术先进型服务企业 15%',
       'software':'重点软件/集成电路 10%', 'nonresident':'非居民企业 10%' };
-    return m[v] || v;
+    if (r.typeKey === 'xw') {
+      const tier = { 'xw_lo':'小型微利企业（利润≤100万，实际约5%）',
+        'xw_mid':'小型微利企业（利润100~300万，实际约10%）',
+        'xw_hi':'小型微利企业（利润超300万，不满足条件，按25%）' };
+      return tier[r.typeDisplay] || '小型微利企业';
+    }
+    return m[r.typeKey] || r.typeKey;
   }
 
   // 结果表头
@@ -558,7 +573,7 @@ function recalcResults() {
     rBody.appendChild(tr);
   }
 
-  addResultRow('企业类型', results.map(r => typeLabel(r.typeKey)), 'total-row', false);
+  addResultRow('企业类型', results.map(r => typeLabel(r)), 'total-row', false);
   addResultRow('营业收入（元）', results.map(r => revenue), 'total-row', false);
   addResultRow('营业外收入（元）', results.map(r => r.nonopIncome || 0));
   addResultRow('实际支出总额（元）', results.map(r => r.totalActual));
